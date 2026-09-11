@@ -49,7 +49,13 @@ def powerup_status_text(label, timer, cooldown):
 
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((WIDTH, HEIGHT))
+    # "display_surface" es la ventana real (puede ser de cualquier tamaño o
+    # pantalla completa). Todo el juego se dibuja sobre "screen", una
+    # superficie lógica fija de WIDTH x HEIGHT, que luego se escala para
+    # llenar por completo "display_surface" (sin franjas negras a los lados).
+    display_surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
+    screen = pygame.Surface((WIDTH, HEIGHT))
+    is_fullscreen = False
     pygame.display.set_caption("Fruit Ninja Final")
     clock = pygame.time.Clock()
     
@@ -88,7 +94,13 @@ def main():
     
     running = True
     while running:
-        mx, my = pygame.mouse.get_pos()
+        # El mouse se reporta en coordenadas reales de la ventana; se convierte
+        # a coordenadas lógicas (800x600) para que los botones y el blade sigan
+        # funcionando igual sin importar el tamaño real de la ventana.
+        raw_mx, raw_my = pygame.mouse.get_pos()
+        disp_w, disp_h = display_surface.get_size()
+        mx = int(raw_mx * WIDTH / disp_w) if disp_w else raw_mx
+        my = int(raw_my * HEIGHT / disp_h) if disp_h else raw_my
         click = False
         
         # Lógica de vibración de pantalla
@@ -108,6 +120,12 @@ def main():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE and ui.current_scene == "GAME":
                     ui.is_paused = not ui.is_paused
+                if event.key == pygame.K_F11:
+                    is_fullscreen = not is_fullscreen
+                    if is_fullscreen:
+                        display_surface = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+                    else:
+                        display_surface = pygame.display.set_mode((WIDTH, HEIGHT), pygame.RESIZABLE)
                     
         # --- SCENE LOGIC ---
         
@@ -362,7 +380,7 @@ def main():
                 screen.blit(slowmo_hud, (20, 75))
 
                 # Indicación de pausa
-                hint = ui.font_small.render("ESC para Pausar", True, (150, 150, 150))
+                hint = ui.font_small.render("ESC para Pausar | F11 Pantalla Completa", True, (150, 150, 150))
                 screen.blit(hint, (WIDTH - hint.get_width() - 20, 20))
 
         elif ui.current_scene == "OVER":
@@ -392,6 +410,12 @@ def main():
                 blade = Blade()
                 powerups = fresh_powerup_state()
 
+        # Escalar la superficie lógica para llenar toda la ventana/pantalla real
+        disp_w, disp_h = display_surface.get_size()
+        if (disp_w, disp_h) != (WIDTH, HEIGHT):
+            pygame.transform.smoothscale(screen, (disp_w, disp_h), display_surface)
+        else:
+            display_surface.blit(screen, (0, 0))
         pygame.display.flip()
         clock.tick(FPS)
         

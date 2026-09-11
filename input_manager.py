@@ -2,6 +2,7 @@ import pygame
 import cv2
 import math
 import time
+import threading
 from sensors import HandTracker, WebcamStream, BackgroundRemover # Reutilizando la lógica robusta existente de sensors
 
 class InputProvider:
@@ -61,51 +62,85 @@ class MouseInput(InputProvider):
 class HandInput(InputProvider):
     def __init__(self, width, height):
         super().__init__(width, height)
-        # Inicializa la webcam y el rastreador
-        # Reutilizamos la lógica de sensors.py que ya está en hilo aparte y optimizada
-        self.webcam = WebcamStream(src=0, width=width, height=height).start()
+        # Capturamos a una resolución menor que la ventana: el frame se reescala
+        # igual al dibujarlo (smoothscale a WIDTH,HEIGHT), pero una imagen más
+        # pequeña hace MUCHO más rápidas tanto la inferencia de MediaPipe como
+        # el recorte de fondo (threshold/connectedComponents/morphology/blur),
+        # que son las partes más caras de cada frame.
+        cam_w, cam_h = 480, 360
+        self.webcam = WebcamStream(src=0, width=cam_w, height=cam_h).start()
         self.tracker = HandTracker(detection_con=0.6, track_con=0.6)
         self.bg_remover = BackgroundRemover()
 
-        # Necesitamos mapear las coordenadas de la cámara a la pantalla
-        self.cam_w = width
-        self.cam_h = height
-        
+        # La cámara puede no honrar exactamente cam_w/cam_h (usa la resolución
+        # soportada más cercana), así que medimos el frame real para el mapeo
+        # de coordenadas en vez de asumir el valor pedido.
+        first_frame = self.webcam.frame
+        if first_frame is not None:
+            self.cam_h, self.cam_w = first_frame.shape[:2]
+        else:
+            self.cam_w, self.cam_h = cam_w, cam_h
+
+        # El seguimiento de mano y la segmentación de fondo son inferencias de
+        # IA relativamente lentas (mucho más que un frame a 60 FPS), y la
+        # segmentación de fondo es bastante más pesada que el seguimiento de
+        # mano. Si ambas corrieran en el mismo hilo/bucle, cada recorte de
+        # fondo retrasaría la siguiente lectura del dedo y la detección se
+        # sentiría "trabada". Por eso van en DOS hilos independientes, cada
+        # uno publicando su propio resultado a su propio ritmo: el dedo se
+        # actualiza rápido sin esperar nunca al recorte de fondo (lento).
+        self._input_lock = threading.Lock()
+        self._latest_input = (None, None, 0, "NONE")
+        self._cutout_lock = threading.Lock()
+        self._latest_cutout = None
+
+        self._running = True
+        self._hand_worker = threading.Thread(target=self._hand_loop, daemon=True)
+        self._bg_worker = threading.Thread(target=self._bg_loop, daemon=True)
+        self._hand_worker.start()
+        self._bg_worker.start()
+
+    def _hand_loop(self):
+        while self._running:
+            frame = self.webcam.frame
+            if frame is None:
+                continue
+            frame = cv2.flip(frame, 1)  # Efecto espejo
+
+            tx, ty, velocity, gesture = self.tracker.find_position(frame)
+            if tx is None:
+                result = (None, None, 0, gesture)
+            else:
+                sx = int((tx / self.cam_w) * self.width)
+                sy = int((ty / self.cam_h) * self.height)
+                result = (sx, sy, velocity, gesture)
+
+            with self._input_lock:
+                self._latest_input = result
+
+    def _bg_loop(self):
+        while self._running:
+            frame = self.webcam.frame
+            if frame is None:
+                continue
+            frame = cv2.flip(frame, 1)  # Efecto espejo
+            cutout = self.bg_remover.cutout(frame)
+
+            with self._cutout_lock:
+                self._latest_cutout = cutout
+
     def get_input(self):
-        frame = self.webcam.read()
-        if frame is None:
-            return None, None, 0, "NONE"
+        with self._input_lock:
+            return self._latest_input
 
-        # Voltear para efecto espejo
-        frame = cv2.flip(frame, 1)
-
-        # El rastreador devuelve coordenadas crudas del frame (asumiendo que sensors.py devuelve píxeles)
-        # Firma de find_position en sensors.py: (frame) -> cx, cy, velocidad, gesto
-        tx, ty, velocity, gesture = self.tracker.find_position(frame)
-
-        # Si sensors.py devuelve None, tx es None
-        if tx is None:
-            return None, None, 0, gesture
-
-        # Lógica de mapeo:
-        # sensors.py ya devuelve coordenadas de píxel relativas al frame que se le pasó.
-        # Como volteamos el frame y lo pasamos a find_position, las x,y son correctas para el frame volteado.
-        # Solo necesitamos escalar si el tamaño de la ventana difiere del tamaño de la cámara
-        # Asumimos 1:1 por ahora si inicializamos la webcam con el tamaño de la ventana
-
-        sx = int((tx / self.cam_w) * self.width)
-        sy = int((ty / self.cam_h) * self.height)
-
-        return sx, sy, velocity, gesture
-        
     def get_frame(self):
         """Devuelve un recorte RGBA solo del jugador, con el fondo eliminado."""
-        frame = self.webcam.frame # Accede al último frame directamente o vía read()
-        if frame is None:
-            return None
-        frame = cv2.flip(frame, 1)
-        return self.bg_remover.cutout(frame)
+        with self._cutout_lock:
+            return self._latest_cutout
 
     def cleanup(self):
+        self._running = False
+        self._hand_worker.join(timeout=1.0)
+        self._bg_worker.join(timeout=1.0)
         self.webcam.stop()
         self.bg_remover.close()
