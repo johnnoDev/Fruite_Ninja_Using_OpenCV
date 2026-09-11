@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+venv/
+.vscode/
+.idea/
+.DS_Store
+
+# Auto-downloaded MediaPipe model
+assets/models/

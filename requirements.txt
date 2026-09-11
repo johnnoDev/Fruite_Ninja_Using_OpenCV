@@ -1,0 +1,7 @@
+# Python 3.13 / 3.14 compatible versions.
+# The classic mediapipe.solutions API has no wheels for 3.13+, so sensors.py
+# uses the MediaPipe Tasks API (HandLandmarker) instead.
+opencv-contrib-python>=5.0.0.93
+mediapipe>=0.10.35
+pygame-ce>=2.5.8
+numpy>=2.5.3
