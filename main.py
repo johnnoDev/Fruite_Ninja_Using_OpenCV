@@ -1,8 +1,6 @@
 import pygame
 import sys
 import random
-import cv2
-import numpy as np
 
 # Modules
 from audio_manager import AudioManager
@@ -136,16 +134,13 @@ def main():
             if ui.is_paused:
                 # Draw game state frozen
                 if hasattr(input_provider, 'get_frame'):
+                    screen.blit(bg_img, (0,0))
                     frame = input_provider.get_frame()
                     if frame is not None:
-                        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        img_rgb = np.rot90(img_rgb)
-                        surf = pygame.surfarray.make_surface(img_rgb)
-                        surf = pygame.transform.flip(surf, True, False)
-                        screen.blit(pygame.transform.scale(surf, (WIDTH, HEIGHT)), (0,0))
-                        screen.blit(bg_img, (0,0), special_flags=pygame.BLEND_MULT)
-                    else:
-                        screen.blit(bg_img, (0,0))
+                        h, w = frame.shape[:2]
+                        surf = pygame.image.frombuffer(frame.tobytes(), (w, h), "RGBA")
+                        surf = pygame.transform.smoothscale(surf, (WIDTH, HEIGHT))
+                        screen.blit(surf, (0,0))
                 else:
                     screen.blit(bg_img, (shake_x, shake_y))
                 
@@ -176,16 +171,13 @@ def main():
                 
                 # Draw Background
                 if hasattr(input_provider, 'get_frame'):
+                    screen.blit(bg_img, (0,0))
                     frame = input_provider.get_frame()
                     if frame is not None:
-                        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                        img_rgb = np.rot90(img_rgb)
-                        surf = pygame.surfarray.make_surface(img_rgb)
-                        surf = pygame.transform.flip(surf, True, False)
-                        screen.blit(pygame.transform.scale(surf, (WIDTH, HEIGHT)), (0,0))
-                        screen.blit(bg_img, (0,0), special_flags=pygame.BLEND_MULT)
-                    else:
-                        screen.blit(bg_img, (0,0))
+                        h, w = frame.shape[:2]
+                        surf = pygame.image.frombuffer(frame.tobytes(), (w, h), "RGBA")
+                        surf = pygame.transform.smoothscale(surf, (WIDTH, HEIGHT))
+                        screen.blit(surf, (0,0))
                 else:
                     screen.blit(bg_img, (shake_x, shake_y))
                 

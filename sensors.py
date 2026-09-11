@@ -3,6 +3,7 @@ import os
 import time
 import math
 import urllib.request
+import numpy as np
 from threading import Thread
 
 import mediapipe as mp
@@ -19,6 +20,14 @@ MODEL_URL = (
     "hand_landmarker/float16/1/hand_landmarker.task"
 )
 
+# Same Tasks API, but for the selfie segmentation model used to cut the
+# player out from their real background.
+SEGMENTER_MODEL_PATH = os.path.join(MODEL_DIR, "selfie_segmenter.tflite")
+SEGMENTER_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/image_segmenter/"
+    "selfie_segmenter/float16/latest/selfie_segmenter.tflite"
+)
+
 
 def _ensure_model():
     if os.path.exists(MODEL_PATH):
@@ -27,6 +36,72 @@ def _ensure_model():
     print("Downloading hand tracking model (~7 MB)...")
     urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
     print("Model downloaded.")
+
+
+def _ensure_segmenter_model():
+    if os.path.exists(SEGMENTER_MODEL_PATH):
+        return
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    print("Downloading background removal model (~250 KB)...")
+    urllib.request.urlretrieve(SEGMENTER_MODEL_URL, SEGMENTER_MODEL_PATH)
+    print("Model downloaded.")
+
+
+class BackgroundRemover:
+    """
+    Uses MediaPipe's selfie segmentation model to isolate the player from
+    whatever is behind them, so only the person shows up over the game art.
+    """
+    def __init__(self):
+        _ensure_segmenter_model()
+
+        options = vision.ImageSegmenterOptions(
+            base_options=mp_python.BaseOptions(model_asset_path=SEGMENTER_MODEL_PATH),
+            running_mode=vision.RunningMode.VIDEO,
+            output_confidence_masks=True,
+        )
+        self.segmenter = vision.ImageSegmenter.create_from_options(options)
+        self._start = time.time()
+
+    def cutout(self, frame):
+        """
+        Returns an RGBA (H, W, 4) uint8 array: the player at full opacity,
+        everything else fully transparent, ready to become a pygame surface.
+        """
+        img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
+
+        timestamp_ms = int((time.time() - self._start) * 1000)
+        result = self.segmenter.segment_for_video(mp_image, timestamp_ms)
+
+        mask = result.confidence_masks[0].numpy_view()  # (H, W), 0..1 person confidence
+
+        # Hard threshold instead of a soft gradient: a wide feather lets
+        # background-colored edge pixels show through at partial alpha,
+        # producing a pale halo around the person. Binarize strictly, drop
+        # any stray blob that isn't the main silhouette, close small holes,
+        # then erode inward to eat the contaminated boundary before a
+        # minimal blur for anti-aliasing only.
+        mask_u8 = (mask * 255).astype(np.uint8)
+        _, binary = cv2.threshold(mask_u8, 160, 255, cv2.THRESH_BINARY)
+
+        num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
+        if num_labels > 1:
+            largest = 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))
+            binary = np.where(labels == largest, 255, 0).astype(np.uint8)
+
+        kernel = np.ones((9, 9), np.uint8)
+        binary = cv2.morphologyEx(binary, cv2.MORPH_CLOSE, kernel)
+        binary = cv2.erode(binary, kernel, iterations=2)
+
+        alpha = cv2.GaussianBlur(binary, (3, 3), 0)
+
+        rgba = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
+        rgba[:, :, 3] = alpha
+        return rgba
+
+    def close(self):
+        self.segmenter.close()
 
 
 class WebcamStream:

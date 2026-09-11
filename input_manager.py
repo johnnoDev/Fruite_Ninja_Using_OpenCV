@@ -2,7 +2,7 @@ import pygame
 import cv2
 import math
 import time
-from sensors import HandTracker, WebcamStream # Re-using existing robust sensors logic
+from sensors import HandTracker, WebcamStream, BackgroundRemover # Re-using existing robust sensors logic
 
 class InputProvider:
     def __init__(self, width, height):
@@ -56,7 +56,8 @@ class HandInput(InputProvider):
         # We reuse the logic from sensors.py which is already threaded and optimized
         self.webcam = WebcamStream(src=0, width=width, height=height).start()
         self.tracker = HandTracker(detection_con=0.6, track_con=0.6)
-        
+        self.bg_remover = BackgroundRemover()
+
         # We need to map camera coords to screen
         self.cam_w = width
         self.cam_h = height
@@ -89,11 +90,13 @@ class HandInput(InputProvider):
         return sx, sy, velocity, is_palm_open
         
     def get_frame(self):
-        """Optional: Return frame for drawing background"""
+        """Return an RGBA cutout of just the player, background removed."""
         frame = self.webcam.frame # Access last frame directly or via read()
-        if frame is not None:
-             frame = cv2.flip(frame, 1)
-        return frame
+        if frame is None:
+            return None
+        frame = cv2.flip(frame, 1)
+        return self.bg_remover.cutout(frame)
 
     def cleanup(self):
         self.webcam.stop()
+        self.bg_remover.close()
