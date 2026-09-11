@@ -90,29 +90,61 @@ class SceneManager:
         self.font_med = pygame.font.Font(None, 50)
         self.font_small = pygame.font.Font(None, 30)
         
-        cx = width // 2
         cy = height // 2
-        
-        # Menu - Use existing PLAY button asset
-        self.btn_play = FrameButton(cx - 100, cy + 50, 200, 80, "PLAY", "GOTO_MODE", use_image="btn_play.png")
-        
-        # Mode Select - Transparent with white borders
-        self.btn_classic = FrameButton(cx - 220, cy + 20, 200, 60, "CLASSIC", "MODE_CLASSIC")
-        self.btn_survival = FrameButton(cx + 20, cy + 20, 200, 60, "SURVIVAL", "MODE_SURVIVAL")
-        self.btn_back_mode = FrameButton(cx - 100, cy + 120, 200, 50, "BACK", "BACK")
-        
-        # Input Select - Transparent with white borders
-        self.btn_mouse = FrameButton(cx - 220, cy + 20, 200, 60, "MOUSE", "INPUT_MOUSE")
-        self.btn_hand = FrameButton(cx + 20, cy + 20, 200, 60, "CAMERA", "INPUT_HAND")
-        self.btn_back_input = FrameButton(cx - 100, cy + 120, 200, 50, "BACK", "BACK")
-        
+
+        # Menu
+        # Note: previously used a "btn_play.png" asset with "PLAY" baked into the
+        # image, which ignored self.text entirely. Rendering it as a normal
+        # bordered button instead keeps it in sync with the label (and any
+        # future language change) and matches the style of every other button.
+        self.btn_play = self._single_button(cy + 50, 80, self.font_med, "JUGAR", "GOTO_MODE")
+
+        # Mode Select - width fits each label, so longer Spanish words don't overlap
+        self.btn_classic, self.btn_survival = self._button_row(
+            cy + 20, 60, self.font_med,
+            [("CLÁSICO", "MODE_CLASSIC"), ("SUPERVIVENCIA", "MODE_SURVIVAL")]
+        )
+        self.btn_back_mode = self._single_button(cy + 120, 50, self.font_small, "ATRÁS", "BACK")
+
+        # Input Select
+        self.btn_mouse, self.btn_hand = self._button_row(
+            cy + 20, 60, self.font_med,
+            [("RATÓN", "INPUT_MOUSE"), ("CÁMARA", "INPUT_HAND")]
+        )
+        self.btn_back_input = self._single_button(cy + 120, 50, self.font_small, "ATRÁS", "BACK")
+
         # Pause menu (frame style)
-        self.btn_resume = FrameButton(cx - 100, cy - 40, 200, 60, "RESUME", "RESUME")
-        self.btn_back_pause = FrameButton(cx - 100, cy + 40, 200, 60, "BACK", "BACK")
-        
+        self.btn_resume = self._single_button(cy - 40, 60, self.font_med, "REANUDAR", "RESUME")
+        self.btn_back_pause = self._single_button(cy + 40, 60, self.font_med, "ATRÁS", "BACK")
+
         # Game Over (frame style)
-        self.btn_replay = FrameButton(cx - 220, cy + 100, 200, 60, "REPLAY", "RESTART")
-        self.btn_home = FrameButton(cx + 20, cy + 100, 200, 60, "HOME", "GOTO_MENU")
+        self.btn_replay, self.btn_home = self._button_row(
+            cy + 100, 60, self.font_med,
+            [("REINTENTAR", "RESTART"), ("INICIO", "GOTO_MENU")]
+        )
+
+    def _button_width(self, font, text, padding=50, min_width=170):
+        """Size a button to fit its label instead of a fixed guess, so
+        translated text of any length never overflows its box."""
+        return max(min_width, font.size(text)[0] + padding)
+
+    def _single_button(self, y, height, font, text, action, padding=50, min_width=170):
+        w = self._button_width(font, text, padding, min_width)
+        x = self.width // 2 - w // 2
+        return FrameButton(x, y, w, height, text, action)
+
+    def _button_row(self, y, height, font, items, gap=24, padding=50, min_width=170):
+        """Lay out several buttons side by side, each sized to its own label,
+        centered as a group so the row stays balanced regardless of length."""
+        widths = [self._button_width(font, text, padding, min_width) for text, _ in items]
+        total_width = sum(widths) + gap * (len(items) - 1)
+        x = self.width // 2 - total_width // 2
+
+        buttons = []
+        for (text, action), w in zip(items, widths):
+            buttons.append(FrameButton(x, y, w, height, text, action))
+            x += w + gap
+        return buttons
     
     def push_scene(self, scene):
         """Push current scene to stack before changing"""
@@ -132,7 +164,7 @@ class SceneManager:
         title = self.font_big.render("FRUIT NINJA V3", True, ORANGE)
         screen.blit(title, (self.width//2 - title.get_width()//2, 100))
         
-        sub = self.font_small.render("Slice fruits with hand or mouse!", True, WHITE)
+        sub = self.font_small.render("¡Corta frutas con tu mano o el ratón!", True, WHITE)
         screen.blit(sub, (self.width//2 - sub.get_width()//2, 180))
         
         # Button drawn last (on top)
@@ -140,7 +172,7 @@ class SceneManager:
 
     def draw_mode_select(self, screen):
         # Title first
-        title = self.font_med.render("SELECT MODE", True, WHITE)
+        title = self.font_med.render("SELECCIONA UN MODO", True, WHITE)
         screen.blit(title, (self.width//2 - title.get_width()//2, 100))
         
         # Buttons drawn last (on top of everything)
@@ -150,7 +182,7 @@ class SceneManager:
 
     def draw_input_select(self, screen):
         # Title first
-        title = self.font_med.render("SELECT CONTROL", True, WHITE)
+        title = self.font_med.render("SELECCIONA EL CONTROL", True, WHITE)
         screen.blit(title, (self.width//2 - title.get_width()//2, 100))
         
         # Buttons drawn last (on top)
@@ -166,7 +198,7 @@ class SceneManager:
         overlay.fill(BLACK)
         screen.blit(overlay, (0, 0))
         
-        title = self.font_big.render("PAUSED", True, ORANGE)
+        title = self.font_big.render("PAUSA", True, ORANGE)
         screen.blit(title, (self.width//2 - title.get_width()//2, 150))
         
         self.btn_resume.draw(screen, self.font_med)
@@ -179,10 +211,10 @@ class SceneManager:
         overlay.fill(BLACK)
         screen.blit(overlay, (0, 0))
         
-        title = self.font_big.render("GAME OVER", True, RED)
+        title = self.font_big.render("FIN DEL JUEGO", True, RED)
         screen.blit(title, (self.width//2 - title.get_width()//2, 150))
-        
-        score_text = self.font_med.render(f"Score: {score}", True, WHITE)
+
+        score_text = self.font_med.render(f"Puntos: {score}", True, WHITE)
         screen.blit(score_text, (self.width//2 - score_text.get_width()//2, 250))
         
         self.btn_replay.draw(screen, self.font_med)

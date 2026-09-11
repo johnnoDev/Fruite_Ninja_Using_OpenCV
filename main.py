@@ -40,11 +40,11 @@ def fresh_powerup_state():
 
 def powerup_status_text(label, timer, cooldown):
     if timer > 0:
-        return f"{label}: ACTIVE ({timer // FPS + 1}s)"
+        return f"{label}: ACTIVO ({timer // FPS + 1}s)"
     elif cooldown > 0:
-        return f"{label}: cooldown ({cooldown // FPS + 1}s)"
+        return f"{label}: recarga ({cooldown // FPS + 1}s)"
     else:
-        return f"{label}: READY"
+        return f"{label}: LISTO"
 
 
 def main():
@@ -336,7 +336,7 @@ def main():
 
                 # Palm pause indicator
                 if input_paused:
-                    txt = ui.font_big.render("PALM PAUSE", True, (255, 255, 0))
+                    txt = ui.font_big.render("PAUSA (PALMA ABIERTA)", True, (255, 255, 0))
                     screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
 
                 # HUD
@@ -345,9 +345,9 @@ def main():
 
                 # Power-up HUD
                 if isinstance(input_provider, HandInput):
-                    shield_label, slowmo_label = "Shield (Fist)", "Slow-Mo (Peace)"
+                    shield_label, slowmo_label = "Escudo (Puño)", "Cámara Lenta (Paz)"
                 else:
-                    shield_label, slowmo_label = "Shield (Right-Click)", "Slow-Mo (Middle-Click)"
+                    shield_label, slowmo_label = "Escudo (Clic Derecho)", "Cámara Lenta (Clic Central)"
 
                 shield_hud = ui.font_small.render(
                     powerup_status_text(shield_label, powerups["shield_timer"], powerups["shield_cooldown"]),
@@ -362,7 +362,7 @@ def main():
                 screen.blit(slowmo_hud, (20, 75))
 
                 # Pause hint
-                hint = ui.font_small.render("ESC to Pause", True, (150, 150, 150))
+                hint = ui.font_small.render("ESC para Pausar", True, (150, 150, 150))
                 screen.blit(hint, (WIDTH - hint.get_width() - 20, 20))
 
         elif ui.current_scene == "OVER":

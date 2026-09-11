@@ -16,7 +16,7 @@ class GameMode:
         pass
         
     def get_status(self):
-        return f"Score: {self.score}  Lives: {self.lives}"
+        return f"Puntos: {self.score}  Vidas: {self.lives}"
 
 class ClassicMode(GameMode):
     def __init__(self):
