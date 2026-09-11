@@ -13,6 +13,9 @@ A high-performance computer vision game where you play Fruit Ninja using your re
 *   **Gameplay Mechanics**:
     *   **Bombs**: Avoid slicing the dark bombs with red fuses! (-5 points).
     *   **Palm Pause**: Show an **Open Palm** to the camera to Pause/Shield the blade (safety mechanism).
+    *   **Gesture Power-ups**: Hold a pose for about a quarter second to activate it (then it goes on cooldown):
+        *   **Fist -> Shield**: Absorbs the next bomb you hit, no life lost.
+        *   **Peace Sign (index + middle finger) -> Slow-Mo**: Fruits and bombs fall in slow motion for a few seconds.
     *   **Score System**: Track your slicing performance.
 
 ## Prerequisites
@@ -48,7 +51,10 @@ uses `pygame-ce` (a drop-in fork of `pygame` that ships 3.14 wheels).
 2.  **Controls**:
     *   **Slice**: Move your index finger across the screen to slice fruits. You must move fast enough to create a "cut".
     *   **Pause**: Open your hand (extend all 5 fingers) to pause the blade. This is useful if a bomb is in the way and you want to move your hand safely.
+    *   **Shield**: Make a fist to arm a shield that absorbs your next bomb hit.
+    *   **Slow-Mo**: Hold up a peace sign (index + middle finger) to slow down falling fruits/bombs for a few seconds.
     *   **Quit**: Close the window or press `Alt+F4`.
+    *   **Playing with Mouse**: the power-ups above need a hand gesture, so mouse mode maps them to extra buttons instead — hold **Right-Click** for Shield, hold **Middle-Click** for Slow-Mo.
 
 ## Troubleshooting
 

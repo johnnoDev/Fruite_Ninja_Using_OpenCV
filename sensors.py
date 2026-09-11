@@ -161,36 +161,48 @@ class HandTracker:
         # Adaptive Smoothing params
         self.alpha = 0.5
 
-    def is_palm_open(self, lm_list):
+    def classify_gesture(self, lm_list):
         """
-        Heuristic to check if hand is open.
-        Checks if tips of fingers (8, 12, 16, 20) are further from the wrist (0)
-        than the corresponding PIP joints.
+        Classifies the hand pose into one of the gestures the game reacts to,
+        based on which of the 4 non-thumb fingers (index, middle, ring, pinky)
+        are extended (tip farther from the wrist than its PIP joint):
+
+        - OPEN_PALM: all 4 extended      -> Palm Pause (existing feature)
+        - FIST:      none extended       -> Shield power-up
+        - PEACE:     only index + middle -> Slow-Mo power-up
+        - NONE:      anything else
         """
         if not lm_list:
-            return False
+            return "NONE"
 
         wrist = lm_list[0]
         tips = [8, 12, 16, 20]
         pips = [6, 10, 14, 18]
 
-        open_fingers = 0
-        for i in range(4):
-            tip = lm_list[tips[i]]
-            pip = lm_list[pips[i]]
+        extended = []
+        for tip_id, pip_id in zip(tips, pips):
+            tip = lm_list[tip_id]
+            pip = lm_list[pip_id]
 
             dist_tip = math.hypot(tip[1] - wrist[1], tip[2] - wrist[2])
             dist_pip = math.hypot(pip[1] - wrist[1], pip[2] - wrist[2])
 
-            if dist_tip > dist_pip:
-                open_fingers += 1
+            extended.append(dist_tip > dist_pip)
 
-        return open_fingers == 4  # Thumb is tricky, ignoring for "Palm"
+        index, middle, ring, pinky = extended
+
+        if index and middle and ring and pinky:
+            return "OPEN_PALM"
+        if not any(extended):
+            return "FIST"
+        if index and middle and not ring and not pinky:
+            return "PEACE"
+        return "NONE"
 
     def find_position(self, frame):
         """
         Processes frame and returns:
-        cx, cy, velocity, is_palm_open
+        cx, cy, velocity, gesture (one of "OPEN_PALM", "FIST", "PEACE", "NONE")
         """
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
@@ -203,7 +215,7 @@ class HandTracker:
         if dt == 0:
             dt = 0.001
 
-        is_open = False
+        gesture = "NONE"
         cx, cy, velocity = None, None, 0.0
 
         if results.hand_landmarks:
@@ -217,7 +229,7 @@ class HandTracker:
             raw_x, raw_y = pixel_lms[8][1], pixel_lms[8][2]
 
             # Check Gesture
-            is_open = self.is_palm_open(pixel_lms)
+            gesture = self.classify_gesture(pixel_lms)
 
             # --- Adaptive Smoothing ---
             dist = math.hypot(raw_x - self.prev_x, raw_y - self.prev_y)
@@ -242,4 +254,4 @@ class HandTracker:
             cx, cy = int(smooth_x), int(smooth_y)
 
         self.prev_time = timestamp
-        return cx, cy, velocity, is_open
+        return cx, cy, velocity, gesture

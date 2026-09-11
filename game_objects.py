@@ -111,14 +111,14 @@ class Fruit(pygame.sprite.Sprite):
         self.vel_y = random.uniform(-10, -7.5) # Tuned for low gravity
         self.gravity = 0.08                    # 40% slower feel (Floaty)
         
-    def update(self):
-        self.vel_y += self.gravity
-        self.pos_x += self.vel_x
-        self.pos_y += self.vel_y
-        
+    def update(self, time_scale=1.0):
+        self.vel_y += self.gravity * time_scale
+        self.pos_x += self.vel_x * time_scale
+        self.pos_y += self.vel_y * time_scale
+
         self.rect.centerx = int(self.pos_x)
         self.rect.centery = int(self.pos_y)
-        
+
         if self.rect.top > self.screen_h:
             self.kill()
             
@@ -183,16 +183,16 @@ class SlicedFruit(pygame.sprite.Sprite):
         self.angle = 0
         self.alpha = 255 # For fading if we want (optional)
 
-    def update(self):
-        self.vel_y += self.gravity
-        self.pos_x += self.vel_x
-        self.pos_y += self.vel_y
-        
+    def update(self, time_scale=1.0):
+        self.vel_y += self.gravity * time_scale
+        self.pos_x += self.vel_x * time_scale
+        self.pos_y += self.vel_y * time_scale
+
         # Rotate
-        self.angle += self.angle_speed
+        self.angle += self.angle_speed * time_scale
         self.image = pygame.transform.rotate(self.original_image, self.angle)
         self.rect = self.image.get_rect(center=(self.pos_x, self.pos_y))
-        
+
         if self.rect.top > 800: # Cleanup
             self.kill()
 
@@ -240,12 +240,13 @@ class Explosion(pygame.sprite.Sprite):
         self.timer = 30 # frames (0.5 sec at 60fps)
         self.original_image = self.image
 
-    def update(self):
+    def update(self, time_scale=1.0):
+        # Cosmetic effect: always plays at normal speed, even during Slow-Mo.
         self.timer -= 1
         # Simple fade
         alpha = int((self.timer / 30) * 255)
         self.image.set_alpha(alpha)
-        
+
         if self.timer <= 0:
             self.kill()
 
@@ -311,9 +312,10 @@ class SplashEffect(pygame.sprite.Sprite):
         self.image = pygame.transform.rotate(self.original_image, angle)
         self.rect = self.image.get_rect(center=(x, y))
         
-    def update(self):
+    def update(self, time_scale=1.0):
+        # Cosmetic effect: always plays at normal speed, even during Slow-Mo.
         self.age += 1
-        
+
         # Fade out
         alpha = int(255 * (1 - self.age / self.lifetime))
         if alpha < 0:

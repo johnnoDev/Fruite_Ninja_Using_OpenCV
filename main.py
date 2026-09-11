@@ -15,7 +15,37 @@ WHITE = (255, 255, 255)
 # Config
 WIDTH, HEIGHT = 800, 600 # Keeping larger window for menu usability
 FPS = 60
-MIN_CUT_VELOCITY = 150 # Rescaled 
+MIN_CUT_VELOCITY = 150 # Rescaled
+
+# Gesture Power-ups
+# Fist -> Shield (blocks the next bomb), Peace sign -> Slow-Mo (fruits/bombs fall slower)
+GESTURE_HOLD_FRAMES = 15       # ~0.25s held pose before a power-up triggers (avoids flicker false-positives)
+SHIELD_DURATION_FRAMES = 300   # 5s window during which the shield is up, waiting to block a bomb
+SHIELD_COOLDOWN_FRAMES = 600   # 10s before Fist can be used again
+SLOWMO_DURATION_FRAMES = 180   # 3s of slowed fall speed
+SLOWMO_COOLDOWN_FRAMES = 480   # 8s before Peace can be used again
+SLOWMO_FACTOR = 0.35           # Fraction of normal fall speed during Slow-Mo
+
+
+def fresh_powerup_state():
+    return {
+        "last_gesture": "NONE",
+        "gesture_hold_count": 0,
+        "shield_timer": 0,
+        "shield_cooldown": 0,
+        "slowmo_timer": 0,
+        "slowmo_cooldown": 0,
+    }
+
+
+def powerup_status_text(label, timer, cooldown):
+    if timer > 0:
+        return f"{label}: ACTIVE ({timer // FPS + 1}s)"
+    elif cooldown > 0:
+        return f"{label}: cooldown ({cooldown // FPS + 1}s)"
+    else:
+        return f"{label}: READY"
+
 
 def main():
     pygame.init()
@@ -45,7 +75,8 @@ def main():
     input_provider = None
     game_mode = None
     blade = Blade()
-    
+    powerups = fresh_powerup_state()
+
     all_sprites = pygame.sprite.Group()
     fruits = pygame.sprite.Group() # Only active fruits (not slices or bombs)
     
@@ -118,6 +149,7 @@ def main():
                     all_sprites.empty()
                     fruits.empty()
                     blade = Blade()
+                    powerups = fresh_powerup_state()
                 elif action == "INPUT_HAND":
                     input_provider = HandInput(WIDTH, HEIGHT)
                     ui.push_scene("GAME")
@@ -125,6 +157,7 @@ def main():
                     all_sprites.empty()
                     fruits.empty()
                     blade = Blade()
+                    powerups = fresh_powerup_state()
                 elif action == "BACK":
                     ui.pop_scene()
                     audio.play_sfx("start")
@@ -167,8 +200,40 @@ def main():
                     audio.play_music("menu")
             else:
                 # Normal gameplay
-                ix, iy, velocity, input_paused = input_provider.get_input()
-                
+                ix, iy, velocity, gesture = input_provider.get_input()
+                input_paused = (gesture == "OPEN_PALM")
+
+                # --- Gesture Power-ups: Fist = Shield, Peace = Slow-Mo ---
+                if gesture in ("FIST", "PEACE") and gesture == powerups["last_gesture"]:
+                    powerups["gesture_hold_count"] += 1
+                else:
+                    powerups["gesture_hold_count"] = 0
+                powerups["last_gesture"] = gesture
+
+                if powerups["gesture_hold_count"] == GESTURE_HOLD_FRAMES:
+                    if gesture == "FIST" and powerups["shield_cooldown"] <= 0 and powerups["shield_timer"] <= 0:
+                        powerups["shield_timer"] = SHIELD_DURATION_FRAMES
+                        audio.play_sfx("start")
+                    elif gesture == "PEACE" and powerups["slowmo_cooldown"] <= 0 and powerups["slowmo_timer"] <= 0:
+                        powerups["slowmo_timer"] = SLOWMO_DURATION_FRAMES
+                        audio.play_sfx("combo")
+
+                if powerups["shield_timer"] > 0:
+                    powerups["shield_timer"] -= 1
+                    if powerups["shield_timer"] <= 0:
+                        powerups["shield_cooldown"] = SHIELD_COOLDOWN_FRAMES
+                elif powerups["shield_cooldown"] > 0:
+                    powerups["shield_cooldown"] -= 1
+
+                if powerups["slowmo_timer"] > 0:
+                    powerups["slowmo_timer"] -= 1
+                    if powerups["slowmo_timer"] <= 0:
+                        powerups["slowmo_cooldown"] = SLOWMO_COOLDOWN_FRAMES
+                elif powerups["slowmo_cooldown"] > 0:
+                    powerups["slowmo_cooldown"] -= 1
+
+                time_scale = SLOWMO_FACTOR if powerups["slowmo_timer"] > 0 else 1.0
+
                 # Draw Background
                 if hasattr(input_provider, 'get_frame'):
                     screen.blit(bg_img, (0,0))
@@ -200,8 +265,8 @@ def main():
                             all_sprites.add(f)
                             fruits.add(f)
                     
-                    all_sprites.update()
-                    
+                    all_sprites.update(time_scale)
+
                     # Collisions
                     segments = blade.get_segments()
                     if velocity > MIN_CUT_VELOCITY and segments:
@@ -209,14 +274,21 @@ def main():
                         for entity in list(fruits):
                             if entity.check_slice(segments):
                                 hit_count += 1
-                                
+
                                 if isinstance(entity, Bomb):
-                                    audio.play_sfx("bomb")
                                     boom = Explosion(entity.pos_x, entity.pos_y)
                                     all_sprites.add(boom)
                                     entity.kill()
-                                    game_mode.on_bomb()
-                                    shake_timer = 20
+                                    if powerups["shield_timer"] > 0:
+                                        # Shield absorbs the bomb: no life lost, consumed on the spot.
+                                        audio.play_sfx("combo")
+                                        powerups["shield_timer"] = 0
+                                        powerups["shield_cooldown"] = SHIELD_COOLDOWN_FRAMES
+                                        shake_timer = 10
+                                    else:
+                                        audio.play_sfx("bomb")
+                                        game_mode.on_bomb()
+                                        shake_timer = 20
                                 else:
                                     audio.play_sfx("splat")
                                     pts = game_mode.on_slice(entity)
@@ -251,16 +323,44 @@ def main():
                 # Draw Game
                 all_sprites.draw(screen)
                 blade.draw(screen)
-                
+
+                # Slow-Mo tint
+                if powerups["slowmo_timer"] > 0:
+                    tint = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+                    tint.fill((30, 80, 255, 40))
+                    screen.blit(tint, (0, 0))
+
+                # Shield border
+                if powerups["shield_timer"] > 0:
+                    pygame.draw.rect(screen, (0, 220, 255), screen.get_rect(), 6)
+
                 # Palm pause indicator
                 if input_paused:
                     txt = ui.font_big.render("PALM PAUSE", True, (255, 255, 0))
                     screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
-                
+
                 # HUD
                 hud = ui.font_small.render(game_mode.get_status(), True, WHITE)
                 screen.blit(hud, (20, 20))
-                
+
+                # Power-up HUD
+                if isinstance(input_provider, HandInput):
+                    shield_label, slowmo_label = "Shield (Fist)", "Slow-Mo (Peace)"
+                else:
+                    shield_label, slowmo_label = "Shield (Right-Click)", "Slow-Mo (Middle-Click)"
+
+                shield_hud = ui.font_small.render(
+                    powerup_status_text(shield_label, powerups["shield_timer"], powerups["shield_cooldown"]),
+                    True, (0, 220, 255)
+                )
+                screen.blit(shield_hud, (20, 50))
+
+                slowmo_hud = ui.font_small.render(
+                    powerup_status_text(slowmo_label, powerups["slowmo_timer"], powerups["slowmo_cooldown"]),
+                    True, (150, 170, 255)
+                )
+                screen.blit(slowmo_hud, (20, 75))
+
                 # Pause hint
                 hint = ui.font_small.render("ESC to Pause", True, (150, 150, 150))
                 screen.blit(hint, (WIDTH - hint.get_width() - 20, 20))
@@ -290,6 +390,7 @@ def main():
                 all_sprites.empty()
                 fruits.empty()
                 blade = Blade()
+                powerups = fresh_powerup_state()
 
         pygame.display.flip()
         clock.tick(FPS)
