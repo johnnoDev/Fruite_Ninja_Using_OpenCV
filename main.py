@@ -2,29 +2,29 @@ import pygame
 import sys
 import random
 
-# Modules
+# Módulos
 from audio_manager import AudioManager
 from input_manager import MouseInput, HandInput
 from ui_manager import SceneManager
 from game_engine import ClassicMode, SurvivalMode
 from game_objects import Blade, Fruit, Bomb, SlicedFruit, Explosion, SplashEffect
 
-# Colors
+# Colores
 WHITE = (255, 255, 255)
 
-# Config
-WIDTH, HEIGHT = 800, 600 # Keeping larger window for menu usability
+# Configuración
+WIDTH, HEIGHT = 800, 600 # Se mantiene una ventana más grande por usabilidad del menú
 FPS = 60
-MIN_CUT_VELOCITY = 150 # Rescaled
+MIN_CUT_VELOCITY = 150 # Reescalado
 
-# Gesture Power-ups
-# Fist -> Shield (blocks the next bomb), Peace sign -> Slow-Mo (fruits/bombs fall slower)
-GESTURE_HOLD_FRAMES = 15       # ~0.25s held pose before a power-up triggers (avoids flicker false-positives)
-SHIELD_DURATION_FRAMES = 300   # 5s window during which the shield is up, waiting to block a bomb
-SHIELD_COOLDOWN_FRAMES = 600   # 10s before Fist can be used again
-SLOWMO_DURATION_FRAMES = 180   # 3s of slowed fall speed
-SLOWMO_COOLDOWN_FRAMES = 480   # 8s before Peace can be used again
-SLOWMO_FACTOR = 0.35           # Fraction of normal fall speed during Slow-Mo
+# Power-ups por gestos
+# Puño -> Escudo (bloquea la siguiente bomba), Seña de paz -> Cámara Lenta (frutas/bombas caen más lento)
+GESTURE_HOLD_FRAMES = 15       # ~0.25s de pose sostenida antes de activar un power-up (evita falsos positivos por parpadeo)
+SHIELD_DURATION_FRAMES = 300   # Ventana de 5s durante la cual el escudo está activo, esperando bloquear una bomba
+SHIELD_COOLDOWN_FRAMES = 600   # 10s antes de que el Puño pueda usarse de nuevo
+SLOWMO_DURATION_FRAMES = 180   # 3s de velocidad de caída reducida
+SLOWMO_COOLDOWN_FRAMES = 480   # 8s antes de que la Paz pueda usarse de nuevo
+SLOWMO_FACTOR = 0.35           # Fracción de la velocidad de caída normal durante la Cámara Lenta
 
 
 def fresh_powerup_state():
@@ -53,15 +53,15 @@ def main():
     pygame.display.set_caption("Fruit Ninja Final")
     clock = pygame.time.Clock()
     
-    # Systems
+    # Sistemas
     audio = AudioManager()
     ui = SceneManager(WIDTH, HEIGHT)
-    
-    # Load Background
+
+    # Cargar fondo
     try:
         bg_raw = pygame.image.load("assets/background/game_background.jpg").convert()
         bg_img = pygame.transform.scale(bg_raw, (WIDTH, HEIGHT))
-        # Darken it
+        # Oscurecerlo
         dark = pygame.Surface((WIDTH, HEIGHT))
         dark.set_alpha(80) # 30% dark
         dark.fill((0, 0, 0))
@@ -71,19 +71,19 @@ def main():
         bg_img = pygame.Surface((WIDTH, HEIGHT))
         bg_img.fill((50, 50, 50))
 
-    # Game State Variables
+    # Variables de estado del juego
     input_provider = None
     game_mode = None
     blade = Blade()
     powerups = fresh_powerup_state()
 
     all_sprites = pygame.sprite.Group()
-    fruits = pygame.sprite.Group() # Only active fruits (not slices or bombs)
-    
-    # VFX State
+    fruits = pygame.sprite.Group() # Solo frutas activas (no rodajas ni bombas)
+
+    # Estado de VFX
     shake_timer = 0
-    
-    # Start Music
+
+    # Iniciar música
     audio.play_music("menu")
     
     running = True
@@ -91,14 +91,14 @@ def main():
         mx, my = pygame.mouse.get_pos()
         click = False
         
-        # Shake Logic
+        # Lógica de vibración de pantalla
         shake_x, shake_y = 0, 0
         if shake_timer > 0:
             shake_timer -= 1
             shake_x = random.randint(-5, 5)
             shake_y = random.randint(-5, 5)
 
-        # Event Loop
+        # Bucle de eventos
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
@@ -163,9 +163,9 @@ def main():
                     audio.play_sfx("start")
 
         elif ui.current_scene == "GAME":
-            # Check if paused
+            # Verificar si está en pausa
             if ui.is_paused:
-                # Draw game state frozen
+                # Dibujar el estado del juego congelado
                 if hasattr(input_provider, 'get_frame'):
                     screen.blit(bg_img, (0,0))
                     frame = input_provider.get_frame()
@@ -180,11 +180,11 @@ def main():
                 all_sprites.draw(screen)
                 blade.draw(screen)
                 
-                # HUD
+                # Interfaz de estado (HUD)
                 hud = ui.font_small.render(game_mode.get_status(), True, WHITE)
                 screen.blit(hud, (20, 20))
                 
-                # Pause menu (mouse-only input)
+                # Menú de pausa (entrada solo con ratón)
                 action = ui.handle_input("PAUSE", mx, my, click)
                 ui.draw_pause(screen)
                 
@@ -199,11 +199,11 @@ def main():
                     ui.pop_scene()
                     audio.play_music("menu")
             else:
-                # Normal gameplay
+                # Juego normal
                 ix, iy, velocity, gesture = input_provider.get_input()
                 input_paused = (gesture == "OPEN_PALM")
 
-                # --- Gesture Power-ups: Fist = Shield, Peace = Slow-Mo ---
+                # --- Power-ups por gesto: Puño = Escudo, Paz = Cámara Lenta ---
                 if gesture in ("FIST", "PEACE") and gesture == powerups["last_gesture"]:
                     powerups["gesture_hold_count"] += 1
                 else:
@@ -234,7 +234,7 @@ def main():
 
                 time_scale = SLOWMO_FACTOR if powerups["slowmo_timer"] > 0 else 1.0
 
-                # Draw Background
+                # Dibujar fondo
                 if hasattr(input_provider, 'get_frame'):
                     screen.blit(bg_img, (0,0))
                     frame = input_provider.get_frame()
@@ -246,12 +246,12 @@ def main():
                 else:
                     screen.blit(bg_img, (shake_x, shake_y))
                 
-                # Update Logic (only if not palm-paused)
+                # Lógica de actualización (solo si no está en pausa por palma)
                 if not input_paused:
                     if ix is not None:
                         blade.update(ix, iy)
-                    
-                    # Spawner
+
+                    # Generador de objetos
                     if random.randint(1, 40) == 1:
                         spawn_x = random.randint(100, WIDTH-100)
                         spawn_y = HEIGHT + 20
@@ -267,7 +267,7 @@ def main():
                     
                     all_sprites.update(time_scale)
 
-                    # Collisions
+                    # Colisiones
                     segments = blade.get_segments()
                     if velocity > MIN_CUT_VELOCITY and segments:
                         hit_count = 0
@@ -280,7 +280,7 @@ def main():
                                     all_sprites.add(boom)
                                     entity.kill()
                                     if powerups["shield_timer"] > 0:
-                                        # Shield absorbs the bomb: no life lost, consumed on the spot.
+                                        # El escudo absorbe la bomba: no se pierde vida, se consume en el acto.
                                         audio.play_sfx("combo")
                                         powerups["shield_timer"] = 0
                                         powerups["shield_cooldown"] = SHIELD_COOLDOWN_FRAMES
@@ -305,7 +305,7 @@ def main():
                         if hit_count > 1:
                             audio.play_sfx("combo")
 
-                    # Check dropped fruits
+                    # Verificar frutas caídas
                     for entity in list(fruits):
                         if entity.rect.top > HEIGHT:
                             if not isinstance(entity, Bomb):
@@ -314,36 +314,36 @@ def main():
                             else:
                                 entity.kill()
 
-                    # Check Game Over
+                    # Verificar fin del juego
                     if game_mode.game_over:
                         ui.current_scene = "OVER"
                         audio.play_sfx("over")
                         audio.stop_music()
                 
-                # Draw Game
+                # Dibujar el juego
                 all_sprites.draw(screen)
                 blade.draw(screen)
 
-                # Slow-Mo tint
+                # Tinte de Cámara Lenta
                 if powerups["slowmo_timer"] > 0:
                     tint = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
                     tint.fill((30, 80, 255, 40))
                     screen.blit(tint, (0, 0))
 
-                # Shield border
+                # Borde del escudo
                 if powerups["shield_timer"] > 0:
                     pygame.draw.rect(screen, (0, 220, 255), screen.get_rect(), 6)
 
-                # Palm pause indicator
+                # Indicador de pausa por palma
                 if input_paused:
                     txt = ui.font_big.render("PAUSA (PALMA ABIERTA)", True, (255, 255, 0))
                     screen.blit(txt, (WIDTH//2 - txt.get_width()//2, HEIGHT//2))
 
-                # HUD
+                # Interfaz de estado (HUD)
                 hud = ui.font_small.render(game_mode.get_status(), True, WHITE)
                 screen.blit(hud, (20, 20))
 
-                # Power-up HUD
+                # HUD de power-ups
                 if isinstance(input_provider, HandInput):
                     shield_label, slowmo_label = "Escudo (Puño)", "Cámara Lenta (Paz)"
                 else:
@@ -361,12 +361,12 @@ def main():
                 )
                 screen.blit(slowmo_hud, (20, 75))
 
-                # Pause hint
+                # Indicación de pausa
                 hint = ui.font_small.render("ESC para Pausar", True, (150, 150, 150))
                 screen.blit(hint, (WIDTH - hint.get_width() - 20, 20))
 
         elif ui.current_scene == "OVER":
-            # Keep drawing game in background
+            # Seguir dibujando el juego en segundo plano
             all_sprites.draw(screen)
             action = ui.handle_input("OVER", mx, my, click)
             ui.draw_game_over(screen, game_mode.score)
@@ -396,7 +396,7 @@ def main():
         clock.tick(FPS)
         
     
-    # Cleanup logic
+    # Lógica de limpieza
     if input_provider:
         input_provider.cleanup()
 

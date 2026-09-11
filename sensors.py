@@ -10,9 +10,9 @@ import mediapipe as mp
 from mediapipe.tasks import python as mp_python
 from mediapipe.tasks.python import vision
 
-# The classic `mediapipe.solutions.hands` API is not shipped in the Python 3.13+
-# wheels, so we use the newer MediaPipe Tasks API (HandLandmarker) instead.
-# It needs a model file that we download once and cache locally.
+# La API clásica `mediapipe.solutions.hands` no viene incluida en los
+# wheels de Python 3.13+, así que usamos la API más nueva de MediaPipe Tasks (HandLandmarker).
+# Necesita un archivo de modelo que descargamos una vez y guardamos en caché localmente.
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "assets", "models")
 MODEL_PATH = os.path.join(MODEL_DIR, "hand_landmarker.task")
 MODEL_URL = (
@@ -20,8 +20,8 @@ MODEL_URL = (
     "hand_landmarker/float16/1/hand_landmarker.task"
 )
 
-# Same Tasks API, but for the selfie segmentation model used to cut the
-# player out from their real background.
+# Misma API de Tasks, pero para el modelo de segmentación selfie usado para recortar
+# al jugador de su fondo real.
 SEGMENTER_MODEL_PATH = os.path.join(MODEL_DIR, "selfie_segmenter.tflite")
 SEGMENTER_MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/image_segmenter/"
@@ -33,24 +33,24 @@ def _ensure_model():
     if os.path.exists(MODEL_PATH):
         return
     os.makedirs(MODEL_DIR, exist_ok=True)
-    print("Downloading hand tracking model (~7 MB)...")
+    print("Descargando modelo de seguimiento de manos (~7 MB)...")
     urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-    print("Model downloaded.")
+    print("Modelo descargado.")
 
 
 def _ensure_segmenter_model():
     if os.path.exists(SEGMENTER_MODEL_PATH):
         return
     os.makedirs(MODEL_DIR, exist_ok=True)
-    print("Downloading background removal model (~250 KB)...")
+    print("Descargando modelo de eliminación de fondo (~250 KB)...")
     urllib.request.urlretrieve(SEGMENTER_MODEL_URL, SEGMENTER_MODEL_PATH)
-    print("Model downloaded.")
+    print("Modelo descargado.")
 
 
 class BackgroundRemover:
     """
-    Uses MediaPipe's selfie segmentation model to isolate the player from
-    whatever is behind them, so only the person shows up over the game art.
+    Usa el modelo de segmentación selfie de MediaPipe para aislar al jugador
+    de lo que sea que esté detrás, de modo que solo la persona se muestre sobre el arte del juego.
     """
     def __init__(self):
         _ensure_segmenter_model()
@@ -65,8 +65,8 @@ class BackgroundRemover:
 
     def cutout(self, frame):
         """
-        Returns an RGBA (H, W, 4) uint8 array: the player at full opacity,
-        everything else fully transparent, ready to become a pygame surface.
+        Devuelve un arreglo RGBA (H, W, 4) uint8: el jugador con opacidad total,
+        todo lo demás completamente transparente, listo para convertirse en una superficie de pygame.
         """
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
@@ -74,14 +74,14 @@ class BackgroundRemover:
         timestamp_ms = int((time.time() - self._start) * 1000)
         result = self.segmenter.segment_for_video(mp_image, timestamp_ms)
 
-        mask = result.confidence_masks[0].numpy_view()  # (H, W), 0..1 person confidence
+        mask = result.confidence_masks[0].numpy_view()  # (H, W), confianza de persona 0..1
 
-        # Hard threshold instead of a soft gradient: a wide feather lets
-        # background-colored edge pixels show through at partial alpha,
-        # producing a pale halo around the person. Binarize strictly, drop
-        # any stray blob that isn't the main silhouette, close small holes,
-        # then erode inward to eat the contaminated boundary before a
-        # minimal blur for anti-aliasing only.
+        # Umbral duro en lugar de un degradado suave: un desvanecido ancho deja
+        # que píxeles de borde con color de fondo se muestren con alfa parcial,
+        # produciendo un halo pálido alrededor de la persona. Binarizar estrictamente, descartar
+        # cualquier mancha suelta que no sea la silueta principal, cerrar pequeños huecos,
+        # y luego erosionar hacia adentro para eliminar el borde contaminado antes de un
+        # desenfoque mínimo solo para el anti-aliasing.
         mask_u8 = (mask * 255).astype(np.uint8)
         _, binary = cv2.threshold(mask_u8, 160, 255, cv2.THRESH_BINARY)
 
@@ -106,16 +106,16 @@ class BackgroundRemover:
 
 class WebcamStream:
     """
-    Threaded webcam capture to ensure the main loop never blocks on I/O.
-    Always holds the most recent frame.
+    Captura de webcam en un hilo aparte para asegurar que el bucle principal nunca se bloquee por E/S.
+    Siempre mantiene el frame más reciente.
     """
     def __init__(self, src=0, width=640, height=480):
-        # cv2.CAP_DSHOW is required on Windows to avoid MSMF errors and reduce initialization latency
+        # cv2.CAP_DSHOW es necesario en Windows para evitar errores de MSMF y reducir la latencia de inicialización
         self.stream = cv2.VideoCapture(src, cv2.CAP_DSHOW)
         self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, width)
         self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
-        # Read first frame to ensure it's working
+        # Leer el primer frame para asegurar que funciona
         (self.grabbed, self.frame) = self.stream.read()
         self.stopped = False
 
@@ -144,33 +144,33 @@ class HandTracker:
         options = vision.HandLandmarkerOptions(
             base_options=mp_python.BaseOptions(model_asset_path=MODEL_PATH),
             running_mode=vision.RunningMode.VIDEO,
-            num_hands=1,                       # Only track one hand for performance
+            num_hands=1,                       # Solo rastrear una mano por rendimiento
             min_hand_detection_confidence=detection_con,
             min_hand_presence_confidence=detection_con,
             min_tracking_confidence=track_con,
         )
         self.landmarker = vision.HandLandmarker.create_from_options(options)
 
-        # Monotonic millisecond timestamp for detect_for_video (must be increasing)
+        # Marca de tiempo monótona en milisegundos para detect_for_video (debe ser creciente)
         self._start = time.time()
 
-        # Tracking State
+        # Estado de seguimiento
         self.prev_x, self.prev_y = 0, 0
         self.prev_time = time.time()
 
-        # Adaptive Smoothing params
+        # Parámetros de suavizado adaptativo
         self.alpha = 0.5
 
     def classify_gesture(self, lm_list):
         """
-        Classifies the hand pose into one of the gestures the game reacts to,
-        based on which of the 4 non-thumb fingers (index, middle, ring, pinky)
-        are extended (tip farther from the wrist than its PIP joint):
+        Clasifica la pose de la mano en uno de los gestos a los que el juego reacciona,
+        según cuáles de los 4 dedos (sin contar el pulgar: índice, medio, anular, meñique)
+        están extendidos (punta más lejos de la muñeca que su articulación PIP):
 
-        - OPEN_PALM: all 4 extended      -> Palm Pause (existing feature)
-        - FIST:      none extended       -> Shield power-up
-        - PEACE:     only index + middle -> Slow-Mo power-up
-        - NONE:      anything else
+        - OPEN_PALM: los 4 extendidos      -> Pausa de palma (función existente)
+        - FIST:      ninguno extendido     -> Power-up de Escudo
+        - PEACE:     solo índice + medio   -> Power-up de Cámara Lenta
+        - NONE:      cualquier otro caso
         """
         if not lm_list:
             return "NONE"
@@ -201,8 +201,8 @@ class HandTracker:
 
     def find_position(self, frame):
         """
-        Processes frame and returns:
-        cx, cy, velocity, gesture (one of "OPEN_PALM", "FIST", "PEACE", "NONE")
+        Procesa el frame y devuelve:
+        cx, cy, velocidad, gesto (uno de "OPEN_PALM", "FIST", "PEACE", "NONE")
         """
         img_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=img_rgb)
@@ -222,16 +222,16 @@ class HandTracker:
             hand_lms = results.hand_landmarks[0]
             h, w = frame.shape[:2]
 
-            # Convert to list of [id, x_px, y_px]
+            # Convertir a lista de [id, x_px, y_px]
             pixel_lms = [[i, int(lm.x * w), int(lm.y * h)] for i, lm in enumerate(hand_lms)]
 
-            # Index Finger Tip is ID 8
+            # La punta del dedo índice es el ID 8
             raw_x, raw_y = pixel_lms[8][1], pixel_lms[8][2]
 
-            # Check Gesture
+            # Verificar gesto
             gesture = self.classify_gesture(pixel_lms)
 
-            # --- Adaptive Smoothing ---
+            # --- Suavizado adaptativo ---
             dist = math.hypot(raw_x - self.prev_x, raw_y - self.prev_y)
             if dist > 30:
                 target_alpha = 0.8

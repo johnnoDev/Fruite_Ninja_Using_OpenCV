@@ -2,7 +2,7 @@ import pygame
 import cv2
 import math
 import time
-from sensors import HandTracker, WebcamStream, BackgroundRemover # Re-using existing robust sensors logic
+from sensors import HandTracker, WebcamStream, BackgroundRemover # Reutilizando la lógica robusta existente de sensors
 
 class InputProvider:
     def __init__(self, width, height):
@@ -11,10 +11,10 @@ class InputProvider:
         
     def get_input(self):
         """
-        Returns (x, y, velocity, gesture)
-        x, y: Screen coordinates (or None)
-        velocity: Pixels per second
-        gesture: One of "OPEN_PALM", "FIST", "PEACE", "NONE"
+        Devuelve (x, y, velocidad, gesto)
+        x, y: Coordenadas de pantalla (o None)
+        velocidad: Píxeles por segundo
+        gesto: Uno de "OPEN_PALM", "FIST", "PEACE", "NONE"
         """
         return None, None, 0, "NONE"
         
@@ -35,16 +35,16 @@ class MouseInput(InputProvider):
         mx, my = pygame.mouse.get_pos()
         buttons = pygame.mouse.get_pressed(num_buttons=3)
 
-        # No camera to read gestures from, so mouse mode maps the two
-        # power-ups to extra mouse buttons instead: Right-Click = Fist
-        # (Shield), Middle-Click = Peace (Slow-Mo).
+        # No hay cámara para leer gestos, así que el modo ratón mapea los dos
+        # power-ups a botones extra del ratón: Clic Derecho = Puño
+        # (Escudo), Clic Central = Paz (Cámara Lenta).
         gesture = "NONE"
         if buttons[2]:
             gesture = "FIST"
         elif buttons[1]:
             gesture = "PEACE"
 
-        # Only track "blade" if left click is held
+        # Solo rastrea la "hoja" si se mantiene presionado el clic izquierdo
         if not buttons[0]:
             self.prev_pos = None
             return None, None, 0, gesture
@@ -61,13 +61,13 @@ class MouseInput(InputProvider):
 class HandInput(InputProvider):
     def __init__(self, width, height):
         super().__init__(width, height)
-        # Initialize Webcam and Tracker
-        # We reuse the logic from sensors.py which is already threaded and optimized
+        # Inicializa la webcam y el rastreador
+        # Reutilizamos la lógica de sensors.py que ya está en hilo aparte y optimizada
         self.webcam = WebcamStream(src=0, width=width, height=height).start()
         self.tracker = HandTracker(detection_con=0.6, track_con=0.6)
         self.bg_remover = BackgroundRemover()
 
-        # We need to map camera coords to screen
+        # Necesitamos mapear las coordenadas de la cámara a la pantalla
         self.cam_w = width
         self.cam_h = height
         
@@ -76,22 +76,22 @@ class HandInput(InputProvider):
         if frame is None:
             return None, None, 0, "NONE"
 
-        # Flip for mirror effect
+        # Voltear para efecto espejo
         frame = cv2.flip(frame, 1)
 
-        # Tracker returns raw frame coords (assuming sensors.py returns pixels)
-        # sensors.py find_position signature: (frame) -> cx, cy, velocity, gesture
+        # El rastreador devuelve coordenadas crudas del frame (asumiendo que sensors.py devuelve píxeles)
+        # Firma de find_position en sensors.py: (frame) -> cx, cy, velocidad, gesto
         tx, ty, velocity, gesture = self.tracker.find_position(frame)
 
-        # If sensors.py returns None, tx is None
+        # Si sensors.py devuelve None, tx es None
         if tx is None:
             return None, None, 0, gesture
 
-        # Map logic:
-        # sensors.py already returns pixel coordinates relative to the frame passed in.
-        # Since we flipped the frame, and passed it to find_position, the x,y are correct for the flipped frame.
-        # We just need to scale if window size differs from camera size
-        # Assuming 1:1 for now if we init webcam with window size
+        # Lógica de mapeo:
+        # sensors.py ya devuelve coordenadas de píxel relativas al frame que se le pasó.
+        # Como volteamos el frame y lo pasamos a find_position, las x,y son correctas para el frame volteado.
+        # Solo necesitamos escalar si el tamaño de la ventana difiere del tamaño de la cámara
+        # Asumimos 1:1 por ahora si inicializamos la webcam con el tamaño de la ventana
 
         sx = int((tx / self.cam_w) * self.width)
         sy = int((ty / self.cam_h) * self.height)
@@ -99,8 +99,8 @@ class HandInput(InputProvider):
         return sx, sy, velocity, gesture
         
     def get_frame(self):
-        """Return an RGBA cutout of just the player, background removed."""
-        frame = self.webcam.frame # Access last frame directly or via read()
+        """Devuelve un recorte RGBA solo del jugador, con el fondo eliminado."""
+        frame = self.webcam.frame # Accede al último frame directamente o vía read()
         if frame is None:
             return None
         frame = cv2.flip(frame, 1)

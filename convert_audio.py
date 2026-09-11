@@ -21,7 +21,7 @@ def convert_audio():
                 clip.write_audiofile(wav_path, logger=None)
                 clip.close()
                 
-                # Verify passed
+                # Verificación superada
                 if os.path.exists(wav_path):
                     print(f"Success. Removing original {filename}")
                     os.remove(m4a_path)

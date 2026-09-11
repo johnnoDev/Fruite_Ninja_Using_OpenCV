@@ -4,7 +4,7 @@ import time
 from collections import deque
 import physics
 
-# Basic Colors
+# Colores básicos
 RED = (255, 50, 50)
 GREEN = (50, 255, 50)
 WHITE = (255, 255, 255)
@@ -12,18 +12,18 @@ ORANGE = (255, 165, 0)
 
 class Blade:
     def __init__(self):
-        # Stores (x, y, timestamp)
-        self.points = deque(maxlen=20) 
-        self.color = (0, 255, 255) # Cyan for high contrast
+        # Almacena (x, y, marca de tiempo)
+        self.points = deque(maxlen=20)
+        self.color = (0, 255, 255) # Cian para alto contraste
         self.min_width = 5
         self.max_width = 25
-        self.fade_speed = 5 # How fast trail fades
+        self.fade_speed = 5 # Qué tan rápido se desvanece la estela
 
     def update(self, x, y):
         current_time = time.time()
         self.points.append((x, y, current_time))
-        
-        # Remove old points (older than 0.2s) to keep trail short & responsive
+
+        # Elimina puntos antiguos (mayores a 0.2s) para mantener la estela corta y ágil
         while self.points:
             if current_time - self.points[0][2] > 0.15:
                 self.points.popleft()
@@ -34,27 +34,27 @@ class Blade:
         if len(self.points) < 2:
             return
             
-        # Draw connected lines with varying thickness
-        # Newest points = thickest
+        # Dibuja líneas conectadas con grosor variable
+        # Los puntos más recientes = más gruesos
         points_list = list(self.points)
         for i in range(len(points_list) - 1):
             p1 = points_list[i]
             p2 = points_list[i+1]
-            
-            # Ratio: 0 (oldest) to 1 (newest)
+
+            # Proporción: 0 (más antiguo) a 1 (más reciente)
             ratio = i / len(points_list)
             width = int(self.min_width + (self.max_width - self.min_width) * ratio)
-            
-            # Draw line segment
-            # Note: Pygame lines with width > 1 have gaps at corners. 
-            # Ideally draw circles at joints, but lines are fast.
+
+            # Dibuja el segmento de línea
+            # Nota: las líneas de Pygame con grosor > 1 tienen huecos en las esquinas.
+            # Idealmente se dibujarían círculos en las uniones, pero las líneas son rápidas.
             start_pos = (p1[0], p1[1])
             end_pos = (p2[0], p2[1])
             pygame.draw.line(screen, self.color, start_pos, end_pos, width)
             pygame.draw.circle(screen, self.color, end_pos, width // 2)
 
     def get_segments(self):
-        """Returns list of line segments ((x1,y1), (x2,y2)) currently active."""
+        """Devuelve la lista de segmentos de línea ((x1,y1), (x2,y2)) actualmente activos."""
         segments = []
         pts = list(self.points)
         for i in range(len(pts) - 1):
@@ -67,32 +67,32 @@ class Fruit(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height, fruit_type=None):
         super().__init__()
         
-        # Available types in assets
+        # Tipos disponibles en los assets
         types = ["apple", "banana", "coconut", "orange", "pineapple", "watermelon"]
         if fruit_type is None:
             self.fruit_type = random.choice(types)
         else:
             self.fruit_type = fruit_type
 
-        # Load Image
-        # Try loading small version for performance if exists, else normal
+        # Cargar imagen
+        # Intenta cargar la versión pequeña por rendimiento si existe, si no la normal
         try:
             path = f"assets/fruits/{self.fruit_type}_small.png"
             if not os.path.exists(path):
                 path = f"assets/fruits/{self.fruit_type}.png"
-            
+
             raw_image = pygame.image.load(path).convert_alpha()
-            # If standard ones are huge (300KB+ pngs might be large), we might need scaling.
-            # Based on file sizes, _small are ~10KB, likely icons. Large are ~300KB.
-            
+            # Si las estándar son enormes (pngs de 300KB+ pueden ser grandes), podríamos necesitar escalarlas.
+            # Según el tamaño de archivo, las _small son ~10KB, probablemente íconos. Las grandes son ~300KB.
+
             if "small" not in path:
-                # Scale down large images to decent game size
+                # Reduce las imágenes grandes a un tamaño de juego decente
                 self.image = pygame.transform.scale(raw_image, (70, 70))
             else:
                 self.image = raw_image
-                
+
         except Exception as e:
-            # Fallback
+            # Alternativa de respaldo
             # print(f"Error loading {self.fruit_type}: {e}")
             self.radius = 35
             self.color = random.choice([RED, ORANGE, GREEN])
@@ -101,15 +101,15 @@ class Fruit(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        self.radius = self.rect.width // 2 # Approx radius for collision
+        self.radius = self.rect.width // 2 # Radio aproximado para colisión
         self.screen_h = height
-        
-        # Physics
+
+        # Física
         self.pos_x = float(x)
         self.pos_y = float(y)
-        self.vel_x = random.uniform(-1.5, 1.5) # Even slower horizontal
-        self.vel_y = random.uniform(-10, -7.5) # Tuned for low gravity
-        self.gravity = 0.08                    # 40% slower feel (Floaty)
+        self.vel_x = random.uniform(-1.5, 1.5) # Horizontal aún más lento
+        self.vel_y = random.uniform(-10, -7.5) # Ajustado para gravedad baja
+        self.gravity = 0.08                    # Sensación 40% más lenta (flotante)
         
     def update(self, time_scale=1.0):
         self.vel_y += self.gravity * time_scale
@@ -124,76 +124,76 @@ class Fruit(pygame.sprite.Sprite):
             
     def check_slice(self, segments):
         """
-        Check collision against a list of blade segments.
-        Using swept-circle (capsule) collision.
+        Verifica la colisión contra una lista de segmentos de la hoja.
+        Usa colisión de círculo barrido (cápsula).
         """
         center = (self.pos_x, self.pos_y)
         for p1, p2 in segments:
-            # We treat the blade as having a thickness
-            # Let's say effective blade radius is 5px
-            if physics.check_capsule_circle_collision(p1, p2, 15, center, self.radius): # Increased blade radius for leniency
+            # Tratamos la hoja como si tuviera un grosor
+            # Digamos que el radio efectivo de la hoja es 5px
+            if physics.check_capsule_circle_collision(p1, p2, 15, center, self.radius): # Radio de hoja aumentado para mayor tolerancia
                 return True
         return False
 
 class SlicedFruit(pygame.sprite.Sprite):
     def __init__(self, x, y, fruit_type, half_id):
         super().__init__()
-        # Try loading specific half
+        # Intenta cargar la mitad específica
         try:
-            # e.g. assets/fruits/apple_half_1_small.png
+            # ej. assets/fruits/apple_half_1_small.png
             base = f"assets/fruits/{fruit_type}_half_{half_id}"
             path_small = f"{base}_small.png"
             path_large = f"{base}.png"
-            
+
             path = path_small if os.path.exists(path_small) else path_large
-            
+
             if os.path.exists(path):
                  raw = pygame.image.load(path).convert_alpha()
                  if "small" not in path:
-                     self.image = pygame.transform.scale(raw, (35, 70)) # generic half size
+                     self.image = pygame.transform.scale(raw, (35, 70)) # tamaño genérico de mitad
                  else:
                      self.image = raw
             else:
                  raise FileNotFoundError(f"Half image not found: {path}")
         except Exception as e:
             print(f"SlicedFruit load error for {fruit_type} half {half_id}: {e}")
-            # Fallback
+            # Alternativa de respaldo
             self.image = pygame.Surface((35, 35), pygame.SRCALPHA)
-            pygame.draw.arc(self.image, GREEN, (0,0,35,35), 0, 3.14, 20)          
+            pygame.draw.arc(self.image, GREEN, (0,0,35,35), 0, 3.14, 20)
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        
-        # Physics to fly apart
+
+        # Física para salir despedidas
         self.pos_x = float(x)
         self.pos_y = float(y)
-        self.gravity = 0.12 # Slow fall
-        
-        # Push apart based on ID
+        self.gravity = 0.12 # Caída lenta
+
+        # Separación según el ID
         if half_id == 1:
             self.vel_x = random.uniform(-4, -1)
             self.angle_speed = 2
         else:
             self.vel_x = random.uniform(1, 4)
             self.angle_speed = -2
-            
-        self.vel_y = random.uniform(-3, -1) # Little pop up
-        
-        # Rotation logic
+
+        self.vel_y = random.uniform(-3, -1) # Pequeño salto hacia arriba
+
+        # Lógica de rotación
         self.original_image = self.image
         self.angle = 0
-        self.alpha = 255 # For fading if we want (optional)
+        self.alpha = 255 # Para desvanecimiento si se desea (opcional)
 
     def update(self, time_scale=1.0):
         self.vel_y += self.gravity * time_scale
         self.pos_x += self.vel_x * time_scale
         self.pos_y += self.vel_y * time_scale
 
-        # Rotate
+        # Rotar
         self.angle += self.angle_speed * time_scale
         self.image = pygame.transform.rotate(self.original_image, self.angle)
         self.rect = self.image.get_rect(center=(self.pos_x, self.pos_y))
 
-        if self.rect.top > 800: # Cleanup
+        if self.rect.top > 800: # Limpieza
             self.kill()
 
 class Bomb(Fruit):
@@ -214,7 +214,7 @@ class Bomb(Fruit):
             self.radius = 40
             self.image = pygame.Surface((80, 80), pygame.SRCALPHA)
             pygame.draw.circle(self.image, (50, 50, 50), (40, 40), 40)
-            pygame.draw.circle(self.image, RED, (40, 40), 10) # Fuse
+            pygame.draw.circle(self.image, RED, (40, 40), 10) # Mecha
         
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
@@ -224,26 +224,26 @@ class Explosion(pygame.sprite.Sprite):
     def __init__(self, x, y):
         super().__init__()
         try:
-            # Use specific explosion asset
+            # Usa el asset específico de explosión
             path = "assets/vfx/explosion_small.png"
             if not os.path.exists(path):
                  path = "assets/vfx/explosion.png"
-            
+
             self.image = pygame.image.load(path).convert_alpha()
-            self.image = pygame.transform.scale(self.image, (150, 150)) # big boom
+            self.image = pygame.transform.scale(self.image, (150, 150)) # explosión grande
         except:
             self.image = pygame.Surface((100, 100))
             self.image.fill(RED)
-            
+
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        self.timer = 30 # frames (0.5 sec at 60fps)
+        self.timer = 30 # frames (0.5 seg a 60fps)
         self.original_image = self.image
 
     def update(self, time_scale=1.0):
-        # Cosmetic effect: always plays at normal speed, even during Slow-Mo.
+        # Efecto cosmético: siempre se reproduce a velocidad normal, incluso durante el Slow-Mo.
         self.timer -= 1
-        # Simple fade
+        # Desvanecimiento simple
         alpha = int((self.timer / 30) * 255)
         self.image.set_alpha(alpha)
 
@@ -251,7 +251,7 @@ class Explosion(pygame.sprite.Sprite):
             self.kill()
 
 class SplashEffect(pygame.sprite.Sprite):
-    # Fruit to splash color mapping
+    # Mapeo de fruta a color de salpicadura
     FRUIT_SPLASH_MAP = {
         "apple": "red",
         "watermelon": "red",
@@ -263,33 +263,33 @@ class SplashEffect(pygame.sprite.Sprite):
     
     def __init__(self, x, y, fruit_type, velocity=0):
         super().__init__()
-        
-        # Determine splash color
+
+        # Determinar el color de la salpicadura
         splash_color = self.FRUIT_SPLASH_MAP.get(fruit_type, "transparent")
-        
-        # Choose size variant based on velocity
-        # High velocity (fast slice) = bigger splash
+
+        # Elegir la variante de tamaño según la velocidad
+        # Velocidad alta (corte rápido) = salpicadura más grande
         if velocity > 400:
-            size_variant = ""  # Use large splash
+            size_variant = ""  # Usa salpicadura grande
             scale_size = (180, 180)
         else:
             size_variant = "_small"
             scale_size = (120, 120)
-        
-        # Load splash image
+
+        # Cargar imagen de salpicadura
         try:
             path = f"assets/vfx/splash_{splash_color}{size_variant}.png"
             if not os.path.exists(path):
-                # Fallback to small if large doesn't exist
+                # Alternativa pequeña si no existe la grande
                 path = f"assets/vfx/splash_{splash_color}_small.png"
                 scale_size = (120, 120)
-            
+
             raw_image = pygame.image.load(path).convert_alpha()
             self.image = pygame.transform.scale(raw_image, scale_size)
             self.original_image = self.image.copy()
-            
+
         except Exception as e:
-            # Fallback to colored circle
+            # Alternativa: círculo de color
             self.image = pygame.Surface((100, 100), pygame.SRCALPHA)
             color_map = {
                 "red": (255, 50, 50),
@@ -302,26 +302,26 @@ class SplashEffect(pygame.sprite.Sprite):
         
         self.rect = self.image.get_rect()
         self.rect.center = (x, y)
-        
-        # Animation properties
-        self.lifetime = 20  # frames (~0.33 sec at 60fps)
+
+        # Propiedades de la animación
+        self.lifetime = 20  # frames (~0.33 seg a 60fps)
         self.age = 0
-        
-        # Slight random rotation for variety
+
+        # Ligera rotación aleatoria para variedad
         angle = random.randint(-15, 15)
         self.image = pygame.transform.rotate(self.original_image, angle)
         self.rect = self.image.get_rect(center=(x, y))
-        
+
     def update(self, time_scale=1.0):
-        # Cosmetic effect: always plays at normal speed, even during Slow-Mo.
+        # Efecto cosmético: siempre se reproduce a velocidad normal, incluso durante el Slow-Mo.
         self.age += 1
 
-        # Fade out
+        # Desvanecimiento
         alpha = int(255 * (1 - self.age / self.lifetime))
         if alpha < 0:
             alpha = 0
-            
-        # Create faded version
+
+        # Crear versión desvanecida
         self.image = self.original_image.copy()
         self.image.set_alpha(alpha)
         

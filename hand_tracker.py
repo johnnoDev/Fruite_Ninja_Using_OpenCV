@@ -11,15 +11,15 @@ class HandTracker:
         self.detection_con = detection_con
         self.track_con = track_con
 
-        # Smoothing State
+        # Estado de suavizado
         self.prev_x, self.prev_y = 0, 0
-        self.alpha = 0.5  # Smoothing factor (0 < alpha < 1). Lower = smoother but more lag.
+        self.alpha = 0.5  # Factor de suavizado (0 < alpha < 1). Menor = más suave pero más retraso.
 
         self.mp_hands = mp.solutions.hands
         self.hands = self.mp_hands.Hands(
             static_image_mode=self.mode,
             max_num_hands=self.max_hands,
-            model_complexity=0,  # Optimized for speed
+            model_complexity=0,  # Optimizado para velocidad
             min_detection_confidence=self.detection_con,
             min_tracking_confidence=self.track_con
         )
@@ -48,26 +48,26 @@ class HandTracker:
 
     def get_tracked_data(self, img):
         """
-        Returns (x, y, velocity) for the index finger tip.
-        Applies EMA smoothing.
+        Devuelve (x, y, velocidad) para la punta del dedo índice.
+        Aplica suavizado EMA.
         """
-        # Process the image first to get landmarks
+        # Procesar la imagen primero para obtener los landmarks
         self.find_hands(img, draw=False)
-        
+
         lm_list = self.find_position(img)
         if len(lm_list) != 0:
-            # Index finger tip is ID 8
+            # La punta del dedo índice es el ID 8
             raw_x, raw_y = lm_list[8][1], lm_list[8][2]
-            
-            # EMA Smoothing
-            # If this is the first frame (prev 0,0), jump straight to it to avoid flying in from corner
+
+            # Suavizado EMA
+            # Si este es el primer frame (prev 0,0), saltar directo a él para evitar que llegue volando desde la esquina
             if self.prev_x == 0 and self.prev_y == 0:
                 self.prev_x, self.prev_y = raw_x, raw_y
-            
+
             curr_x = self.alpha * raw_x + (1 - self.alpha) * self.prev_x
             curr_y = self.alpha * raw_y + (1 - self.alpha) * self.prev_y
-            
-            # Velocity Calculation ( Euclidean distance per frame )
+
+            # Cálculo de velocidad (distancia euclidiana por frame)
             velocity = math.hypot(curr_x - self.prev_x, curr_y - self.prev_y)
             
             self.prev_x, self.prev_y = curr_x, curr_y

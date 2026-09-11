@@ -7,7 +7,7 @@ class GameMode:
         
     def on_slice(self, fruit_obj):
         self.score += 1
-        return 1 # Points
+        return 1 # Puntos
         
     def on_bomb(self):
         pass
@@ -25,19 +25,19 @@ class ClassicMode(GameMode):
         self.name = "Classic"
         
     def on_slice(self, fruit_obj):
-        # Bonus for criticals? Simple +1 for now
+        # ¿Bono por críticos? Simple +1 por ahora
         self.score += 1
         return 1
-        
+
     def on_bomb(self):
-        # Classic: Bomb = -1 Life (or Game Over in arcade, but user said -1 life)
-        # Re-reading prompt: "Classic Mode: ... Bombs reduce lives"
+        # Clásico: Bomba = -1 Vida (o Fin del Juego en arcade, pero se pidió -1 vida)
+        # Releyendo el prompt: "Modo Clásico: ... Las bombas reducen vidas"
         self.lives -= 1
         if self.lives <= 0:
             self.game_over = True
-            
+
     def on_miss(self):
-        # Missed fruit = -1 life
+        # Fruta perdida = -1 vida
         self.lives -= 1
         if self.lives <= 0:
             self.game_over = True
@@ -53,11 +53,11 @@ class SurvivalMode(GameMode):
         return 1
         
     def on_bomb(self):
-        # Instant death
+        # Muerte instantánea
         self.lives = 0
         self.game_over = True
-        
+
     def on_miss(self):
-        # Instant death
+        # Muerte instantánea
         self.lives = 0
         self.game_over = True

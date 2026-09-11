@@ -21,7 +21,7 @@ class AudioManager:
     def init_mixer(self):
         if not pygame.mixer.get_init():
             pygame.mixer.init(frequency=44100, size=-16, channels=2, buffer=512)
-        pygame.mixer.set_num_channels(32) # Allow many sounds at once
+        pygame.mixer.set_num_channels(32) # Permite muchos sonidos a la vez
         
     def load_assets(self):
         if not os.path.exists(self.asset_dir):
@@ -33,7 +33,7 @@ class AudioManager:
             lower_name = filename.lower()
             
             try:
-                # Load based on keywords
+                # Cargar según palabras clave
                 if "music menu" in lower_name:
                     self.sounds["menu_music"] = path
                 elif "game start" in lower_name: # 37. U I Game Start
@@ -54,7 +54,7 @@ class AudioManager:
                 print(f"Failed to load audio {filename}: {e}")
 
     def play_music(self, bg_type="menu"):
-        """Plays background music looping."""
+        """Reproduce la música de fondo en bucle."""
         try:
             path = None
             if bg_type == "menu":
@@ -66,7 +66,7 @@ class AudioManager:
                 
             if path:
                 pygame.mixer.music.load(path)
-                pygame.mixer.music.play(-1) # Loop
+                pygame.mixer.music.play(-1) # Bucle
                 pygame.mixer.music.set_volume(0.5)
         except Exception as e:
             print(f"Music Error: {e}")
@@ -75,7 +75,7 @@ class AudioManager:
         pygame.mixer.music.stop()
 
     def play_sfx(self, sound_type):
-        """Plays a one-shot sound effect."""
+        """Reproduce un efecto de sonido de una sola vez."""
         try:
             sound = None
             if sound_type == "splat" and self.sounds["splat"]:
@@ -95,5 +95,5 @@ class AudioManager:
             if sound:
                 sound.play()
         except Exception as e:
-            # print(f"SFX Error: {e}") 
+            # print(f"Error de SFX: {e}")
             pass
